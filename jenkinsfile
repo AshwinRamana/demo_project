@@ -1,0 +1,82 @@
+pipeline {
+    agent any
+    
+    environment {
+        FLUTTER_HOME = '/opt/flutter'
+        ANDROID_HOME = '/opt/android-sdk'
+        PATH = "$FLUTTER_HOME/bin:$ANDROID_HOME/tools:$ANDROID_HOME/platform-tools:$PATH"
+        PLAY_CREDS = credentials('google-play-credentials')
+        APP_BUNDLE_PATH = 'build/app/outputs/bundle/release/app-release.aab'
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                git branch: 'main', url: 'https://github.com/AshwinRamana/demo_project.git'
+            }
+        }
+        
+        stage('Flutter Environment Check') {
+            steps {
+                sh 'flutter doctor -v'
+            }
+        }
+        
+        stage('Dependencies') {
+            steps {
+                sh 'flutter pub get'
+            }
+        }
+        
+        stage('Update Version') {
+            steps {
+                script {
+                    def pubspecFile = readFile 'pubspec.yaml'
+                    def newVersion = "1.0.${env.BUILD_NUMBER}"
+                    pubspecFile = pubspecFile.replaceAll(
+                        /version: ([0-9]+\.[0-9]+\.)([0-9]+)(\+[0-9]+)?/, 
+                        "version: ${newVersion}+${env.BUILD_NUMBER}"
+                    )
+                    writeFile file: 'pubspec.yaml', text: pubspecFile
+                    sh 'grep "version:" pubspec.yaml'
+                }
+            }
+        }
+        
+        stage('Build Android App Bundle') {
+            steps {
+                sh 'flutter build appbundle --release'
+                sh 'ls -la build/app/outputs/bundle/release/'
+            }
+        }
+        
+        stage('Upload to Play Store') {
+            environment {
+                GOOGLE_APPLICATION_CREDENTIALS = "${PLAY_CREDS}"
+            }
+            steps {
+                androidApkUpload(
+                    googleCredentialsId: 'google-play-credentials',
+                    apkFilesPattern: "${APP_BUNDLE_PATH}",
+                    trackName: 'internal',
+                    rolloutPercentage: '100'
+                )
+                
+                echo "Successfully uploaded ${APP_BUNDLE_PATH} to Google Play"
+            }
+        }
+    }
+    
+    post {
+        success {
+            echo 'Build and deployment successful!'
+        }
+        failure {
+            echo 'Build or deployment failed!'
+        }
+        always {
+            archiveArtifacts artifacts: "${APP_BUNDLE_PATH}", allowEmptyArchive: true
+            cleanWs()
+        }
+    }
+}
