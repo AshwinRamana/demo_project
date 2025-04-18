@@ -5,7 +5,6 @@ pipeline {
         FLUTTER_HOME = '/opt/flutter'
         ANDROID_HOME = '/opt/android-sdk'
         PATH = "$FLUTTER_HOME/bin:$ANDROID_HOME/tools:$ANDROID_HOME/platform-tools:$PATH"
-        PLAY_CREDS = credentials('google-play-credentials')
         APP_BUNDLE_PATH = 'build/app/outputs/bundle/release/app-release.aab'
     }
     
@@ -50,21 +49,19 @@ pipeline {
         }
         
         stage('Upload to Play Store') {
-            environment {
-                GOOGLE_APPLICATION_CREDENTIALS = "${PLAY_CREDS}"
-            }
             steps {
+                withCredentials([file(credentialsId: 'google-play-credentials', variable: 'PLAY_CREDS')]) {
+                    sh 'echo "Using service account credentials from $PLAY_CREDS"'
+
                 androidApkUpload(
-                    googleCredentialsId: 'google-play-credentials',
-                    apkFilesPattern: "${APP_BUNDLE_PATH}",
-                    trackName: 'internal',
-                    rolloutPercentage: '100'
-                )
-                
-                echo "Successfully uploaded ${APP_BUNDLE_PATH} to Google Play"
-            }
+                googleCredentialsId: 'google-play-credentials',
+                apkFilesPattern: "${APP_BUNDLE_PATH}",
+                trackName: 'internal',
+                rolloutPercentage: '100'
+            )
         }
     }
+}
     
     post {
         success {
