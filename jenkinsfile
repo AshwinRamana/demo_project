@@ -28,20 +28,19 @@ pipeline {
             }
         }
         
-        stage('Update Version') {
+         stage('Update Version') {
             steps {
-                script {
-                    def pubspecFile = readFile 'pubspec.yaml'
-                    def newVersion = "1.0.${env.BUILD_NUMBER}"
-                    pubspecFile = pubspecFile.replaceAll(
-                        /version: ([0-9]+\.[0-9]+\.)([0-9]+)(\+[0-9]+)?/, 
-                        "version: ${newVersion}+${env.BUILD_NUMBER}"
-                    )
-                    writeFile file: 'pubspec.yaml', text: pubspecFile
-                    sh 'grep "version:" pubspec.yaml'
-                }
-            }
+              script {
+                   def pubspecFile = readFile 'pubspec.yaml'
+                   def newVersion = "1.0.${env.BUILD_NUMBER}"
+                   def pattern = "version: ([0-9]+\\.[0-9]+\\.)([0-9]+)(\\+[0-9]+)?"
+                   def replacement = "version: ${newVersion}+${env.BUILD_NUMBER}"
+                   pubspecFile = pubspecFile.replaceAll(pattern, replacement)
+                   writeFile file: 'pubspec.yaml', text: pubspecFile
+                   sh 'grep "version:" pubspec.yaml'
         }
+    }
+}
         
         stage('Build Android App Bundle') {
             steps {
