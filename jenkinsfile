@@ -1,68 +1,69 @@
 pipeline {
     agent any
-    
+
     environment {
         FLUTTER_HOME = '/opt/flutter'
         ANDROID_HOME = '/opt/android-sdk'
         PATH = "$FLUTTER_HOME/bin:$ANDROID_HOME/tools:$ANDROID_HOME/platform-tools:$PATH"
         APP_BUNDLE_PATH = 'build/app/outputs/bundle/release/app-release.aab'
     }
-    
+
     stages {
         stage('Checkout') {
             steps {
                 git branch: 'main', url: 'https://github.com/AshwinRamana/demo_project.git'
             }
         }
-        
+
         stage('Flutter Environment Check') {
             steps {
                 sh 'flutter doctor -v'
             }
         }
-        
+
         stage('Dependencies') {
             steps {
                 sh 'flutter pub get'
             }
         }
-        
-         stage('Update Version') {
+
+        stage('Update Version') {
             steps {
-              script {
-                   def pubspecFile = readFile 'pubspec.yaml'
-                   def newVersion = "1.0.${env.BUILD_NUMBER}"
-                   def pattern = "version: ([0-9]+\\.[0-9]+\\.)([0-9]+)(\\+[0-9]+)?"
-                   def replacement = "version: ${newVersion}+${env.BUILD_NUMBER}"
-                   pubspecFile = pubspecFile.replaceAll(pattern, replacement)
-                   writeFile file: 'pubspec.yaml', text: pubspecFile
-                   sh 'grep "version:" pubspec.yaml'
+                script {
+                    def pubspecFile = readFile 'pubspec.yaml'
+                    def newVersion = "1.0.${env.BUILD_NUMBER}"
+                    def pattern = "version: ([0-9]+\\.[0-9]+\\.)([0-9]+)(\\+[0-9]+)?"
+                    def replacement = "version: ${newVersion}+${env.BUILD_NUMBER}"
+                    pubspecFile = pubspecFile.replaceAll(pattern, replacement)
+                    writeFile file: 'pubspec.yaml', text: pubspecFile
+                    sh 'grep "version:" pubspec.yaml'
+                }
+            }
         }
-    }
-}
-        
+
         stage('Build Android App Bundle') {
             steps {
                 sh 'flutter build appbundle --release'
                 sh 'ls -la build/app/outputs/bundle/release/'
             }
         }
-        
+
         stage('Upload to Play Store') {
             steps {
                 withCredentials([file(credentialsId: 'google-play-credentials', variable: 'PLAY_CREDS')]) {
                     sh 'echo "Using service account credentials from $PLAY_CREDS"'
 
-                androidApkUpload(
-                googleCredentialsId: 'google-play-credentials',
-                apkFilesPattern: "${APP_BUNDLE_PATH}",
-                trackName: 'internal',
-                rolloutPercentage: '100'
-            )
+                    androidApkUpload(
+                        googleCredentialsId: 'google-play-credentials',
+                        apkFilesPattern: "${APP_BUNDLE_PATH}",
+                        trackName: 'internal',
+                        rolloutPercentage: '100'
+                    )
+                }
+            }
         }
     }
-}
-    
+
     post {
         success {
             echo 'Build and deployment successful!'
