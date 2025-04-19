@@ -53,7 +53,7 @@ pipeline {
                 withCredentials([file(credentialsId: 'google-play-credentials', variable: 'PLAY_CREDS')]) {
                     sh 'echo "Using service account credentials from $PLAY_CREDS"'
 
-                    androidAppBundleUpload(
+                    androidApkUpload(
                         googleCredentialsId: 'google-play-credentials',
                         apkFilesPattern: "${APP_BUNDLE_PATH}",
                         trackName: 'internal',
