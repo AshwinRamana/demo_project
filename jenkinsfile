@@ -34,7 +34,7 @@ pipeline {
 
         stage('Upload to Play Store') {
             steps {
-                withCredentials([file(credentialsId: 'google-credentials', variable: 'PLAY_STORE_CONFIG_JSON')]) {
+                withCredentials([file(credentialsId: 'google-play-credentials', variable: 'PLAY_STORE_CONFIG_JSON')]) {
                     sh '''
                         cd android
                         PLAY_STORE_CONFIG_JSON="$PLAY_STORE_CONFIG_JSON" fastlane android upload_to_play_store
