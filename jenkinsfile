@@ -51,72 +51,76 @@ pipeline {
         stage('Upload to Play Store') {
             steps {
                 script {
-                    // Use a direct command with the Google Play Android Publisher tool
-                    // or use a direct API call with the JSON file path
+                    // Create a temporary credential in Jenkins
                     sh '''
-                        echo "Using direct path to JSON key file"
+                        echo "Creating temporary credential for Google Play upload"
                         
-                        # Example using the Google Play Android Publisher CLI tool
-                        # Replace this with the actual command for your environment
+                        # Using CURL to upload directly to Google Play
+                        # Requires Google Play Developer API access token
                         
-                        export GOOGLE_APPLICATION_CREDENTIALS=/home/ecbeeuser159/jenkins_keys/play-store-key.json
+                        # First, get an access token using the service account key
+                        ACCESS_TOKEN=$(curl -s -X POST https://oauth2.googleapis.com/token \
+                          -d "grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer" \
+                          -d "assertion=$(cat /home/ecbeeuser159/jenkins_keys/play-store-key.json | jq -r '.private_key' | openssl dgst -sha256 -sign <(cat /home/ecbeeuser159/jenkins_keys/play-store-key.json | jq -r '.private_key') | base64 -w 0)" \
+                          | jq -r '.access_token')
+                          
+                        if [ -z "$ACCESS_TOKEN" ]; then
+                            echo "Failed to get access token"
+                            exit 1
+                        fi
                         
-                        # Use bundletool or the Google Play Developer API directly
-                        # For example, using a wrapper script:
+                        # Now use the token to upload the app bundle
+                        PACKAGE_NAME="com.example.demo_project"  # Replace with your actual package name
                         
-                        bash -c '
-                            python3 <<EOF
-import os
-import google.auth
-import googleapiclient.discovery
-from googleapiclient.http import MediaFileUpload
-
-# Get credentials from environment variable
-credentials, _ = google.auth.default()
-
-# Build the service
-service = googleapiclient.discovery.build("androidpublisher", "v3", credentials=credentials)
-
-# Upload the app bundle
-package_name = "com.example.demo_project"  # Replace with your package name
-app_bundle_path = "${APP_BUNDLE_PATH}"
-
-edit_request = service.edits().insert(body={}, packageName=package_name)
-edit_response = edit_request.execute()
-edit_id = edit_response["id"]
-
-# Upload the bundle
-with open(app_bundle_path, "rb") as bundle:
-    upload_request = service.edits().bundles().upload(
-        editId=edit_id,
-        packageName=package_name,
-        media_body=MediaFileUpload(app_bundle_path, mimetype="application/octet-stream")
-    )
-    upload_response = upload_request.execute()
-
-# Assign to track
-track_request = service.edits().tracks().update(
-    editId=edit_id,
-    packageName=package_name,
-    track="internal",
-    body={
-        "track": "internal",
-        "releases": [{
-            "versionCodes": [upload_response["versionCode"]],
-            "status": "completed",
-            "userFraction": 1.0
-        }]
-    }
-)
-track_response = track_request.execute()
-
-# Commit changes
-commit_request = service.edits().commit(editId=edit_id, packageName=package_name)
-commit_response = commit_request.execute()
-
-print("App bundle uploaded and assigned to internal track")
-EOF
-                        '
+                        # Create an edit
+                        EDIT_ID=$(curl -s -X POST \
+                          -H "Authorization: Bearer $ACCESS_TOKEN" \
+                          -H "Content-Type: application/json" \
+                          https://www.googleapis.com/androidpublisher/v3/applications/$PACKAGE_NAME/edits \
+                          -d '{}' | jq -r '.id')
+                          
+                        if [ -z "$EDIT_ID" ]; then
+                            echo "Failed to create edit"
+                            exit 1
+                        fi
+                        
+                        echo "Created edit with ID: $EDIT_ID"
+                        
+                        # Upload the app bundle
+                        UPLOAD_RESPONSE=$(curl -s -X POST \
+                          -H "Authorization: Bearer $ACCESS_TOKEN" \
+                          -H "Content-Type: application/octet-stream" \
+                          --data-binary @"${APP_BUNDLE_PATH}" \
+                          https://www.googleapis.com/upload/androidpublisher/v3/applications/$PACKAGE_NAME/edits/$EDIT_ID/bundles?uploadType=media)
+                          
+                        VERSION_CODE=$(echo $UPLOAD_RESPONSE | jq -r '.versionCode')
+                        
+                        if [ -z "$VERSION_CODE" ]; then
+                            echo "Failed to upload app bundle"
+                            exit 1
+                        fi
+                        
+                        echo "Uploaded app bundle with version code: $VERSION_CODE"
+                        
+                        # Assign to track
+                        curl -s -X PUT \
+                          -H "Authorization: Bearer $ACCESS_TOKEN" \
+                          -H "Content-Type: application/json" \
+                          https://www.googleapis.com/androidpublisher/v3/applications/$PACKAGE_NAME/edits/$EDIT_ID/tracks/internal \
+                          -d "{
+                            \"releases\": [{
+                              \"versionCodes\": [$VERSION_CODE],
+                              \"status\": \"completed\"
+                            }]
+                          }"
+                          
+                        # Commit the changes
+                        curl -s -X POST \
+                          -H "Authorization: Bearer $ACCESS_TOKEN" \
+                          -H "Content-Type: application/json" \
+                          https://www.googleapis.com/androidpublisher/v3/applications/$PACKAGE_NAME/edits/$EDIT_ID:commit
+                          
+                        echo "Successfully uploaded app bundle to internal track"
                     '''
                 }
             }
