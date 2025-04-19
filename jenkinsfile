@@ -51,24 +51,73 @@ pipeline {
         stage('Upload to Play Store') {
             steps {
                 script {
-                    // Copy the file to a temporary location with a known name
-                    sh "cp /home/ecbeeuser159/jenkins_keys/play-store-key.json ./play-store-key.json"
-                    
-                    // Register this temporary file as a credential for this build only
-                    withCredentials([
-                        string(credentialsId: 'temp_play_store_key', variable: 'DUMMY', 
-                              fileBinding: [fileContent: readFile('./play-store-key.json')])
-                    ]) {
-                        androidApkUpload(
-                            googleCredentialsId: 'temp_play_store_key',
-                            apkFilesPattern: "${APP_BUNDLE_PATH}",
-                            trackName: 'internal',
-                            rolloutPercentage: '100'
-                        )
-                    }
-                    
-                    // Clean up the temporary file
-                    sh "rm ./play-store-key.json"
+                    // Use a direct command with the Google Play Android Publisher tool
+                    // or use a direct API call with the JSON file path
+                    sh '''
+                        echo "Using direct path to JSON key file"
+                        
+                        # Example using the Google Play Android Publisher CLI tool
+                        # Replace this with the actual command for your environment
+                        
+                        export GOOGLE_APPLICATION_CREDENTIALS=/home/ecbeeuser159/jenkins_keys/play-store-key.json
+                        
+                        # Use bundletool or the Google Play Developer API directly
+                        # For example, using a wrapper script:
+                        
+                        bash -c '
+                            python3 <<EOF
+import os
+import google.auth
+import googleapiclient.discovery
+from googleapiclient.http import MediaFileUpload
+
+# Get credentials from environment variable
+credentials, _ = google.auth.default()
+
+# Build the service
+service = googleapiclient.discovery.build("androidpublisher", "v3", credentials=credentials)
+
+# Upload the app bundle
+package_name = "com.example.demo_project"  # Replace with your package name
+app_bundle_path = "${APP_BUNDLE_PATH}"
+
+edit_request = service.edits().insert(body={}, packageName=package_name)
+edit_response = edit_request.execute()
+edit_id = edit_response["id"]
+
+# Upload the bundle
+with open(app_bundle_path, "rb") as bundle:
+    upload_request = service.edits().bundles().upload(
+        editId=edit_id,
+        packageName=package_name,
+        media_body=MediaFileUpload(app_bundle_path, mimetype="application/octet-stream")
+    )
+    upload_response = upload_request.execute()
+
+# Assign to track
+track_request = service.edits().tracks().update(
+    editId=edit_id,
+    packageName=package_name,
+    track="internal",
+    body={
+        "track": "internal",
+        "releases": [{
+            "versionCodes": [upload_response["versionCode"]],
+            "status": "completed",
+            "userFraction": 1.0
+        }]
+    }
+)
+track_response = track_request.execute()
+
+# Commit changes
+commit_request = service.edits().commit(editId=edit_id, packageName=package_name)
+commit_response = commit_request.execute()
+
+print("App bundle uploaded and assigned to internal track")
+EOF
+                        '
+                    '''
                 }
             }
         }
