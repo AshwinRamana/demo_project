@@ -7,7 +7,7 @@ platform :android do
       track: 'internal',
       aab: '../build/app/outputs/bundle/release/app-release.aab',
       json_key: ENV['PLAY_STORE_CONFIG_JSON'],
-      package_name: 'com.demo_project', # ← Replace with your package name
+      package_name: 'com.demo_project', # ← Replace with your package nam
       skip_upload_metadata: true,
       skip_upload_images: true,
       skip_upload_screenshots: true
