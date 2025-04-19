@@ -36,6 +36,7 @@ pipeline {
         stage('Upload to Play Store') {
             steps {
                 sh '''
+                    export PATH=$PATH:/usr/local/bin:/usr/local/lib/ruby/gems/*/bin:$HOME/.gem/ruby/*/bin
                     cd android
                     fastlane android upload_to_play_store
                 '''
