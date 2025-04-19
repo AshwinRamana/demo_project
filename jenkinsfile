@@ -52,13 +52,17 @@ pipeline {
         stage('Upload to Play Store') {
             steps {
                 sh 'echo "Using service account credentials from $PLAY_CREDS_PATH"'
-
-                androidApkUpload(
-                    googleCredentialsFile: "${PLAY_CREDS_PATH}",
-                    apkFilesPattern: "${APP_BUNDLE_PATH}",
-                    trackName: 'internal',
-                    rolloutPercentage: '100'
-                )
+                
+                // Set the GOOGLE_APPLICATION_CREDENTIALS environment variable
+                // This is a standard way Google libraries look for credentials
+                withEnv(["GOOGLE_APPLICATION_CREDENTIALS=${PLAY_CREDS_PATH}"]) {
+                    androidApkUpload(
+                        googleCredentialsId: '',  // Empty string since we're using env var
+                        apkFilesPattern: "${APP_BUNDLE_PATH}",
+                        trackName: 'internal',
+                        rolloutPercentage: '100'
+                    )
+                }
             }
         }
     }
