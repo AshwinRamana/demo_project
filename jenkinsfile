@@ -38,7 +38,7 @@ pipeline {
                     sh '''
                         export PATH="/home/linuxbrew/.linuxbrew/Cellar/fastlane/2.227.1/bin:$PATH"
                         cd android
-                        PLAY_STORE_CONFIG_JSON="$PLAY_STORE_CONFIG_JSON" fastlane android upload_to_play_store
+                        PLAY_STORE_CONFIG_JSON="$PLAY_STORE_CONFIG_JSON" fastlane android upload_to_play_store --verbose
                     '''
                 }
             }
