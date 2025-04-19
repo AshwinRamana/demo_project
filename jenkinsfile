@@ -6,6 +6,7 @@ pipeline {
         ANDROID_HOME = '/opt/android-sdk'
         PATH = "$FLUTTER_HOME/bin:$ANDROID_HOME/tools:$ANDROID_HOME/platform-tools:$PATH"
         APP_BUNDLE_PATH = 'build/app/outputs/bundle/release/app-release.aab'
+        PLAY_STORE_CONFIG_JSON = '/home/ecbeeuser159/jenkins_keys/play-store-key.json'
     }
 
     stages {
@@ -34,12 +35,10 @@ pipeline {
 
         stage('Upload to Play Store') {
             steps {
-                withCredentials([file(credentialsId: 'google-play-credentials', variable: 'PLAY_STORE_CONFIG_JSON')]) {
-                    sh '''
-                        cd android
-                        PLAY_STORE_CONFIG_JSON="$PLAY_STORE_CONFIG_JSON" fastlane android upload_to_play_store
-                    '''
-                }
+                sh '''
+                    cd android
+                    fastlane android upload_to_play_store
+                '''
             }
         }
     }
