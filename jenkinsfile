@@ -15,62 +15,36 @@ pipeline {
             }
         }
 
-        stage('Flutter Environment Check') {
-            steps {
-                sh 'flutter doctor -v'
-            }
-        }
-
-        stage('Dependencies') {
+        stage('Flutter Build') {
             steps {
                 sh 'flutter pub get'
-            }
-        }
-
-        stage('Update Version') {
-            steps {
+                
+                // Update version number
                 script {
                     def pubspecFile = readFile 'pubspec.yaml'
                     def newVersion = "1.0.${env.BUILD_NUMBER}"
-                    def pattern = "version: ([0-9]+\\.[0-9]+\\.)([0-9]+)(\\+[0-9]+)?"
-                    def replacement = "version: ${newVersion}+${env.BUILD_NUMBER}"
-                    pubspecFile = pubspecFile.replaceAll(pattern, replacement)
+                    pubspecFile = pubspecFile.replaceAll("version: ([0-9]+\\.[0-9]+\\.)([0-9]+)(\\+[0-9]+)?", "version: ${newVersion}+${env.BUILD_NUMBER}")
                     writeFile file: 'pubspec.yaml', text: pubspecFile
-                    sh 'grep "version:" pubspec.yaml'
                 }
-            }
-        }
-
-        stage('Build Android App Bundle') {
-            steps {
+                
+                // Build app bundle
                 sh 'flutter build appbundle --release'
-                sh 'ls -la build/app/outputs/bundle/release/'
             }
         }
 
         stage('Upload to Play Store') {
             steps {
-                withCredentials([file(credentialsId: 'google_credentials', variable: 'PLAY_CREDS')]) {
-                    sh 'echo "Using service account credentials from $PLAY_CREDS"'
-
-                    androidApkUpload(
-                        googleCredentialsId: 'google_credentials',
-                        apkFilesPattern: "${APP_BUNDLE_PATH}",
-                        trackName: 'internal',
-                        rolloutPercentage: '100'
-                    )
+                withCredentials([file(credentialsId: 'google-credentials', variable: 'PLAY_STORE_CONFIG_JSON')]) {
+                    sh '''
+                        cd android
+                        PLAY_STORE_CONFIG_JSON="$PLAY_STORE_CONFIG_JSON" fastlane android upload_to_play_store
+                    '''
                 }
             }
         }
     }
 
     post {
-        success {
-            echo 'Build and deployment successful!'
-        }
-        failure {
-            echo 'Build or deployment failed!'
-        }
         always {
             archiveArtifacts artifacts: "${APP_BUNDLE_PATH}", allowEmptyArchive: true
             cleanWs()

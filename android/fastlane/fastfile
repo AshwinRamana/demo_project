@@ -1,0 +1,16 @@
+fastlane_version "2.227.1"
+default_platform :android
+
+platform :android do
+  lane :upload_to_play_store do
+    upload_to_play_store(
+      track: 'internal',
+      aab: '../build/app/outputs/bundle/release/app-release.aab',
+      json_key: ENV['PLAY_STORE_CONFIG_JSON'],
+      package_name: 'com.demo_project', # ← Replace with your package name
+      skip_upload_metadata: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true
+    )
+  end
+end
