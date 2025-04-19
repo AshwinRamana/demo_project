@@ -51,77 +51,24 @@ pipeline {
         stage('Upload to Play Store') {
             steps {
                 script {
-                    // Create a temporary credential in Jenkins
-                    sh '''
-                        echo "Creating temporary credential for Google Play upload"
-                        
-                        # Using CURL to upload directly to Google Play
-                        # Requires Google Play Developer API access token
-                        
-                        # First, get an access token using the service account key
-                        ACCESS_TOKEN=$(curl -s -X POST https://oauth2.googleapis.com/token \
-                          -d "grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer" \
-                          -d "assertion=$(cat /home/ecbeeuser159/jenkins_keys/play-store-key.json | jq -r '.private_key' | openssl dgst -sha256 -sign <(cat /home/ecbeeuser159/jenkins_keys/play-store-key.json | jq -r '.private_key') | base64 -w 0)" \
-                          | jq -r '.access_token')
-                          
-                        if [ -z "$ACCESS_TOKEN" ]; then
-                            echo "Failed to get access token"
-                            exit 1
-                        fi
-                        
-                        # Now use the token to upload the app bundle
-                        PACKAGE_NAME="com.example.demo_project"  # Replace with your actual package name
-                        
-                        # Create an edit
-                        EDIT_ID=$(curl -s -X POST \
-                          -H "Authorization: Bearer $ACCESS_TOKEN" \
-                          -H "Content-Type: application/json" \
-                          https://www.googleapis.com/androidpublisher/v3/applications/$PACKAGE_NAME/edits \
-                          -d '{}' | jq -r '.id')
-                          
-                        if [ -z "$EDIT_ID" ]; then
-                            echo "Failed to create edit"
-                            exit 1
-                        fi
-                        
-                        echo "Created edit with ID: $EDIT_ID"
-                        
-                        # Upload the app bundle
-                        UPLOAD_RESPONSE=$(curl -s -X POST \
-                          -H "Authorization: Bearer $ACCESS_TOKEN" \
-                          -H "Content-Type: application/octet-stream" \
-                          --data-binary @"${APP_BUNDLE_PATH}" \
-                          https://www.googleapis.com/upload/androidpublisher/v3/applications/$PACKAGE_NAME/edits/$EDIT_ID/bundles?uploadType=media)
-                          
-                        VERSION_CODE=$(echo $UPLOAD_RESPONSE | jq -r '.versionCode')
-                        
-                        if [ -z "$VERSION_CODE" ]; then
-                            echo "Failed to upload app bundle"
-                            exit 1
-                        fi
-                        
-                        echo "Uploaded app bundle with version code: $VERSION_CODE"
-                        
-                        # Assign to track
-                        curl -s -X PUT \
-                          -H "Authorization: Bearer $ACCESS_TOKEN" \
-                          -H "Content-Type: application/json" \
-                          https://www.googleapis.com/androidpublisher/v3/applications/$PACKAGE_NAME/edits/$EDIT_ID/tracks/internal \
-                          -d "{
-                            \"releases\": [{
-                              \"versionCodes\": [$VERSION_CODE],
-                              \"status\": \"completed\"
-                            }]
-                          }"
-                          
-                        # Commit the changes
-                        curl -s -X POST \
-                          -H "Authorization: Bearer $ACCESS_TOKEN" \
-                          -H "Content-Type: application/json" \
-                          https://www.googleapis.com/androidpublisher/v3/applications/$PACKAGE_NAME/edits/$EDIT_ID:commit
-                          
-                        echo "Successfully uploaded app bundle to internal track"
-                    '''
+                    // Copy the file to a temporary location with a known name
+                    sh "cp /home/ecbeeuser159/jenkins_keys/play-store-key.json ./play-store-key.json"
+                    
+                    // Register this temporary file as a credential for this build only
+                    withCredentials([
+                        string(credentialsId: 'temp_play_store_key', variable: 'DUMMY', 
+                              fileBinding: [fileContent: readFile('./play-store-key.json')])
+                    ]) {
+                        androidApkUpload(
+                            googleCredentialsId: 'temp_play_store_key',
+                            apkFilesPattern: "${APP_BUNDLE_PATH}",
+                            trackName: 'internal',
+                            rolloutPercentage: '100'
+                        )
+                    }
+                    
+                    // Clean up the temporary file
+                    sh "rm ./play-store-key.json"
                 }
             }
         }
