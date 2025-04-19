@@ -50,25 +50,15 @@ pipeline {
 
         stage('Upload to Play Store') {
             steps {
-                script {
-                    // Copy the file to a temporary location with a known name
-                    sh "cp /home/ecbeeuser159/jenkins_keys/play-store-key.json ./play-store-key.json"
-                    
-                    // Register this temporary file as a credential for this build only
-                    withCredentials([
-                        string(credentialsId: 'temp_play_store_key', variable: 'DUMMY', 
-                              fileBinding: [fileContent: readFile('./play-store-key.json')])
-                    ]) {
-                        androidApkUpload(
-                            googleCredentialsId: 'temp_play_store_key',
-                            apkFilesPattern: "${APP_BUNDLE_PATH}",
-                            trackName: 'internal',
-                            rolloutPercentage: '100'
-                        )
-                    }
-                    
-                    // Clean up the temporary file
-                    sh "rm ./play-store-key.json"
+                withCredentials([file(credentialsId: 'google_play_credentials', variable: 'PLAY_CREDS')]) {
+                    sh 'echo "Using service account credentials from $PLAY_CREDS"'
+
+                    androidApkUpload(
+                        googleCredentialsId: 'google_play_credentials',
+                        apkFilesPattern: "${APP_BUNDLE_PATH}",
+                        trackName: 'internal',
+                        rolloutPercentage: '100'
+                    )
                 }
             }
         }
