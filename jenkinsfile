@@ -50,11 +50,11 @@ pipeline {
 
         stage('Upload to Play Store') {
             steps {
-                withCredentials([file(credentialsId: 'google-play-credentials', variable: 'PLAY_CREDS')]) {
+                withCredentials([file(credentialsId: 'google_credentials', variable: 'PLAY_CREDS')]) {
                     sh 'echo "Using service account credentials from $PLAY_CREDS"'
 
                     androidApkUpload(
-                        googleCredentialsId: 'google-play-credentials',
+                        googleCredentialsId: 'google_credentials',
                         apkFilesPattern: "${APP_BUNDLE_PATH}",
                         trackName: 'internal',
                         rolloutPercentage: '100'
