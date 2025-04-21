@@ -6,8 +6,6 @@ pipeline {
         ANDROID_HOME = '/opt/android-sdk'
         PATH = "$FLUTTER_HOME/bin:$ANDROID_HOME/tools:$ANDROID_HOME/platform-tools:$PATH"
         APP_BUNDLE_PATH = 'build/app/outputs/bundle/release/app-release.aab'
-        // Set this to resolve the interactive mode issue
-        FASTLANE_OPT_OUT_USAGE = 'YES'
     }
 
     stages {
@@ -34,76 +32,17 @@ pipeline {
             }
         }
 
-        stage('Setup Ruby and Fastlane') {
-            steps {
-                sh '''
-                    # Install or ensure Ruby is available
-                    command -v ruby >/dev/null 2>&1 || { echo "Installing Ruby"; apt-get update && apt-get install -y ruby-full; }
-                    
-                    # Install bundler if needed
-                    gem install bundler
-                    
-                    # Setup fastlane directory structure from scratch
-                    mkdir -p android/fastlane
-                    
-                    # Create proper Fastfile - explicitly defining all parameters
-                    cat > android/fastlane/Fastfile << 'EOF'
-default_platform(:android)
-
-platform :android do
-  desc "Deploy a new version to the Google Play"
-  lane :deploy do
-    upload_to_play_store(
-      aab: '../build/app/outputs/bundle/release/app-release.aab',
-      skip_upload_metadata: true,
-      skip_upload_images: true,
-      skip_upload_screenshots: true,
-      release_status: "completed",
-      track: "production"
-    )
-  end
-end
-EOF
-                    
-                    # Create Appfile with local credentials path
-                    cat > android/fastlane/Appfile << 'EOF'
-json_key_file(".android/credentials/play-store-key.json")
-package_name("com.demo_project")
-EOF
-                    
-                    # Create Gemfile for bundler
-                    cat > android/Gemfile << 'EOF'
-source "https://rubygems.org"
-gem "fastlane"
-EOF
-                    
-                    # Install fastlane via bundler
-                    cd android
-                    bundle install
-                '''
-            }
-        }
-
         stage('Upload to Play Store') {
             steps {
-                sh '''
-                    # Set environment variables to help with non-interactive mode
-                    export FASTLANE_SKIP_UPDATE_CHECK=true
-                    export FASTLANE_HIDE_CHANGELOG=true
-                    export FASTLANE_SKIP_ACTION_SUMMARY=true
-                    export FASTLANE_OPT_OUT_USAGE=YES
-                    export LC_ALL=en_US.UTF-8
-                    export LANG=en_US.UTF-8
-                    
-                    cd android
-                    
-                    # Ensure credentials directory exists with proper permissions
-                    mkdir -p credentials
-                    chmod 600 credentials/play-store-key.json || true
-                    
-                    # Run fastlane with bundler
-                    bundle exec fastlane deploy
-                '''
+                withCredentials([file(credentialsId: 'google-play-credentials', variable: 'GOOGLE_PLAY_KEY')]) {
+                    androidApkUpload(
+                        googleCredentialsId: 'google-play-credentials',
+                        apkFilesPattern: "${APP_BUNDLE_PATH}",
+                        trackName: 'internal',  // Can be 'internal', 'alpha', 'beta', or 'production'
+                        rolloutPercentage: '100',
+                        deobfuscationFilesPattern: '**/mapping.txt'  // Optional, if you have ProGuard enabled
+                    )
+                }
             }
         }
     }
