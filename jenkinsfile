@@ -6,8 +6,6 @@ pipeline {
         ANDROID_HOME = '/opt/android-sdk'
         PATH = "$FLUTTER_HOME/bin:$ANDROID_HOME/tools:$ANDROID_HOME/platform-tools:$PATH"
         APP_BUNDLE_PATH = 'build/app/outputs/bundle/release/app-release.aab'
-        // Path to the Play Store credentials in the project directory
-        PLAY_STORE_CONFIG_JSON = "${WORKSPACE}/android/credentials/play-store-key.json"
     }
 
     stages {
@@ -34,6 +32,32 @@ pipeline {
             }
         }
 
+        stage('Setup Fastlane') {
+            steps {
+                // Ensure Fastfile exists and has correct settings
+                sh '''
+                    cd android
+                    
+                    # Setup Appfile with proper credentials path
+                    cat > fastlane/Appfile << 'EOF'
+json_key_file("./credentials/play-store-key.json")
+package_name("com.demo_project")
+EOF
+                    
+                    # Make sure no Gemfile exists (to avoid bundle exec requirement)
+                    if [ -f "Gemfile" ]; then
+                        mv Gemfile Gemfile.bak
+                    fi
+                    
+                    # Ensure credentials directory exists
+                    mkdir -p credentials
+                    
+                    # Set proper permissions
+                    chmod 600 credentials/play-store-key.json || true
+                '''
+            }
+        }
+
         stage('Upload to Play Store') {
             steps {
                 sh '''
@@ -41,11 +65,8 @@ pipeline {
                     export PATH="/home/linuxbrew/.linuxbrew/Cellar/fastlane/2.227.1/bin:$PATH"
                     cd android
                     
-                    # Ensure the credentials file has the correct permissions
-                    chmod 600 credentials/play-store-key.json
-                    
-                    # Run the deploy lane in fastlane
-                    fastlane android deploy --verbose
+                    # Force yes to all prompts
+                    echo y | fastlane android deploy --verbose
                 '''
             }
         }
