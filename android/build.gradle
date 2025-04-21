@@ -1,11 +1,7 @@
-buildscript {
+allprojects {
     repositories {
         google()
         mavenCentral()
-    }
-
-    dependencies {
-        classpath("com.github.triplet.gradle:play-publisher:3.8.4")
     }
 }
 
@@ -20,4 +16,5 @@ subprojects {
 tasks.register("clean", Delete) {
     delete rootProject.buildDir
 }
+
 
