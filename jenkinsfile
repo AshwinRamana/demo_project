@@ -34,12 +34,14 @@ pipeline {
 
         stage('Upload to Play Store') {
             steps {
-                withCredentials([file(credentialsId: 'google-play-credentials', variable: 'PLAY_STORE_CONFIG_JSON')]) {
-                    sh '''
-                        export PATH="/home/linuxbrew/.linuxbrew/Cellar/fastlane/2.227.1/bin:$PATH"
-                        cd android
-                        PLAY_STORE_CONFIG_JSON="$PLAY_STORE_CONFIG_JSON" fastlane android upload_to_play_store
-                    '''
+                withCredentials([file(credentialsId: 'google-play-credentials', variable: 'GOOGLE_PLAY_KEY')]) {
+                    androidApkUpload(
+                        googleCredentialsId: 'google-play-credentials',
+                        apkFilesPattern: "${APP_BUNDLE_PATH}",
+                        trackName: 'internal',  // Can be 'internal', 'alpha', 'beta', or 'production'
+                        rolloutPercentage: '100',
+                        deobfuscationFilesPattern: '**/mapping.txt'  // Optional, if you have ProGuard enabled
+                    )
                 }
             }
         }
