@@ -36,6 +36,8 @@ pipeline {
             steps {
                 withCredentials([file(credentialsId: 'google-play-credentials', variable: 'PLAY_STORE_CONFIG_JSON')]) {
                     sh '''
+                        export FASTLANE_DISABLE_INTERACTIVE=true
+
                         export PATH="/home/linuxbrew/.linuxbrew/Cellar/fastlane/2.227.1/bin:$PATH"
                         cd android
                         PLAY_STORE_CONFIG_JSON="$PLAY_STORE_CONFIG_JSON" fastlane android upload_to_play_store --verbose
