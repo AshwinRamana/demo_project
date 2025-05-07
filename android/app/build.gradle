@@ -53,9 +53,4 @@ flutter {
     source = "../.."
 }
 
-play {
-    serviceAccountCredentials = file("play-store-credentials/credentials.json")
-    track = "internal"
-    releaseStatus = com.github.triplet.gradle.androidpublisher.ReleaseStatus.DRAFT
-    defaultToAppBundles = true
-}
+
